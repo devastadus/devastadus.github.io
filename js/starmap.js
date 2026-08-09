@@ -25,7 +25,8 @@
   const ELITE_W = 0.4, ENEMY_W = 1;  // weightedNodes chances
 
   // Flight timings, ms. FLIGHT must stay in step with .mship's CSS transition.
-  const LAUNCH = 1100, AIM = 420, FLIGHT = 850, DWELL = 1250, CLEARED = 3000, REROLL = 900;
+  // CLEARED is just long enough to read the payoff line before the sector resets.
+  const LAUNCH = 1100, AIM = 420, FLIGHT = 850, DWELL = 1250, CLEARED = 1600, REROLL = 600;
 
   const KINDS = {
     start: { name: 'HOME STATION', blurb: 'Launch point — the run starts here', icon: 'assets/map/node-start.png' },
