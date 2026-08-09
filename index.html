@@ -483,16 +483,13 @@ section{padding:90px 20px;max-width:1100px;margin:0 auto}
 .mnode.k-elite{--mc:var(--c-legendary)}
 .mnode.k-shop{--mc:var(--holo)}
 .mnode.k-boss{--mc:var(--c-mythical)}
-.mnode.reach{cursor:pointer;animation:node-pulse 1.5s ease-in-out infinite}
-.mnode.reach:hover{animation:none;
-  box-shadow:0 0 24px color-mix(in srgb,var(--mc) 75%,transparent),0 0 0 1px rgba(0,0,0,.5)}
+/* .reach = the hop the ship is lining up next (set by starmap.js, not hover) */
+.mnode.reach{animation:node-pulse 1.5s ease-in-out infinite}
 @keyframes node-pulse{
   0%,100%{box-shadow:0 0 4px color-mix(in srgb,var(--mc) 40%,transparent),0 0 0 1px rgba(0,0,0,.5)}
   50%{box-shadow:0 0 20px color-mix(in srgb,var(--mc) 80%,transparent),0 0 0 1px rgba(0,0,0,.5)}}
 .mnode.visited{border-color:var(--gold);
   box-shadow:0 0 12px rgba(245,185,66,.4),0 0 0 1px rgba(0,0,0,.5)}
-.mnode.deny{animation:node-deny .28s ease}
-@keyframes node-deny{25%{transform:translate(-50%,-50%) translateX(-4px)}75%{transform:translate(-50%,-50%) translateX(4px)}}
 .mnode:not(.reach):not(.visited){opacity:.55}
 .mship{position:absolute;z-index:2;width:30px;height:30px;transform:translate(-50%,-50%);
   pointer-events:none;transition:left .85s cubic-bezier(.45,.05,.25,1),top .85s cubic-bezier(.45,.05,.25,1)}
@@ -502,16 +499,15 @@ section{padding:90px 20px;max-width:1100px;margin:0 auto}
   transform:translate(-50%,-130%);white-space:nowrap;text-align:center;
   background:rgba(5,8,16,.92);border:1px solid var(--holo-dim);padding:7px 11px}
 .map-tip.show{display:block}
+.map-tip.below{transform:translate(-50%,30%)}
 .map-tip b{display:block;font-family:'Press Start 2P',monospace;font-size:8px;letter-spacing:1px;
   color:var(--holo);margin-bottom:3px}
 .map-tip span{font-size:11px;color:var(--text-dim);letter-spacing:.5px}
-.map-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
-  border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
+.map-foot{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;
+  min-height:22px;border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
 #map-status{font-family:'Press Start 2P',monospace;font-size:9px;line-height:1.7;
-  letter-spacing:1px;color:var(--holo)}
+  letter-spacing:1px;color:var(--holo);text-align:center}
 #map-status.gold{color:var(--gold)}
-.map-reroll{padding:11px 16px;font-size:9px}
-.map-reroll.pulse{animation:pulse-glow 2.4s ease-in-out infinite}
 .map-view.rr .mnode,.map-view.rr .medge{animation:map-glitch .3s steps(3) both}
 @keyframes map-glitch{from{opacity:0;filter:brightness(3) saturate(0)}to{opacity:1}}
 .map-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:18px;margin-top:26px}
@@ -569,7 +565,6 @@ footer .tiny{margin-top:8px;font-size:11px;opacity:.7}
   .mnode.big{--mn:52px}
   .mship{width:24px;height:24px}
   .map-view{height:min(60vh,540px)}
-  .map-foot{justify-content:center;text-align:center}
 }
 @media (max-width:640px){
   .navlinks{display:none}
@@ -595,7 +590,7 @@ footer .tiny{margin-top:8px;font-size:11px;opacity:.7}
   .glitch.glitching::before,.glitch.glitching::after{animation:none;opacity:0}
   .sec-head h2::after{transition:none}
   .reveal{transition:none}
-  .medge.reach,.mnode.reach,.map-reroll.pulse,.map-view.rr .mnode,.map-view.rr .medge{animation:none}
+  .medge.reach,.mnode.reach,.map-view.rr .mnode,.map-view.rr .medge{animation:none}
   .mship{transition:none}
 }
 </style>
@@ -913,19 +908,20 @@ footer .tiny{margin-top:8px;font-size:11px;opacity:.7}
 <section id="starmap">
   <div class="sec-head reveal">
     <h2>CHART YOUR <span>COURSE</span></h2>
-    <p>Every run generates a fresh sector map. Jumps only reach connected sites one row up — straight ahead or one lane to either side — so each route is a chain of choices: fight, refit, or gamble on an elite. All routes end at the pirate base. Plot a course below, straight from the game's own map generator.</p>
+    <p>Every run generates a fresh sector map. Jumps only reach connected sites one row up — straight ahead or one lane to either side — so each route is a chain of choices: fight, refit, or gamble on an elite. All routes end at the pirate base. Watch a run play out below, charted by the game's own map generator.</p>
   </div>
   <div class="card starmap-card reveal">
     <span class="grid-tick tl">NAV // SECTOR CHART</span>
     <span class="grid-tick tr" id="map-seed">SEED 0000</span>
-    <div class="map-view" id="map-view">
-      <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
-      <div class="mship" id="map-ship"><img src="assets/ship-f222.png" alt="Your ship" class="pixel"></div>
-      <div class="map-tip" id="map-tip" role="tooltip" aria-hidden="true"></div>
+    <!-- Decorative: an auto-playing run. The legend below carries the same
+         information as text, so screen readers get that instead. -->
+    <div class="map-view" id="map-view" aria-hidden="true">
+      <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+      <div class="mship" id="map-ship"><img src="assets/ship-f222.png" alt="" class="pixel"></div>
+      <div class="map-tip" id="map-tip"></div>
     </div>
     <div class="map-foot">
-      <span id="map-status">PLOT A COURSE — SELECT A GLOWING WAYPOINT</span>
-      <button class="btn alt map-reroll" id="map-reroll" type="button">&#8635; NEW SECTOR</button>
+      <span id="map-status" role="status">AWAITING NAV UPLINK</span>
     </div>
   </div>
   <div class="map-legend">

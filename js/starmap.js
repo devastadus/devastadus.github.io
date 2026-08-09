@@ -1,8 +1,12 @@
 /* Sector star map — a port of the game's StarMapGenerator: a floors×lanes grid,
    several routes walked bottom-to-top with -1/0/+1 lane steps, weighted node
    types (Pirates 1.0 / Elite 0.4), a Trading Post row forced at the midpoint,
-   Home Station below and the Pirate Base above. The player plots jumps along
-   connected edges, exactly like in-game. */
+   Home Station below and the Pirate Base above.
+
+   This is a demo reel, not a game: nothing here is clickable. The ship picks a
+   random legal route and flies it home-to-boss on its own, then the sector
+   rerolls and it runs again. The loop only ticks while the section is on
+   screen and the tab is visible. */
 (function () {
   const view = document.getElementById('map-view');
   if (!view) return;
@@ -12,7 +16,6 @@
   const tip = document.getElementById('map-tip');
   const seedEl = document.getElementById('map-seed');
   const statusEl = document.getElementById('map-status');
-  const rerollBtn = document.getElementById('map-reroll');
   const SVGNS = 'http://www.w3.org/2000/svg';
 
   // Same tuning as StarMapConfig.asset
@@ -21,12 +24,20 @@
   const SHOP_FLOOR = 2;              // fixedFloors: floor 3, 1-based
   const ELITE_W = 0.4, ENEMY_W = 1;  // weightedNodes chances
 
+  // Flight timings, ms. FLIGHT must stay in step with .mship's CSS transition.
+  const LAUNCH = 1100, AIM = 420, FLIGHT = 850, DWELL = 1250, CLEARED = 3000, REROLL = 900;
+
   const KINDS = {
     start: { name: 'HOME STATION', blurb: 'Launch point — the run starts here', icon: 'assets/map/node-start.png' },
     enemy: { name: 'PIRATES', blurb: 'Pirate ambush — fight for salvage', icon: 'assets/map/node-enemy.png' },
     elite: { name: 'ELITE PIRATES', blurb: 'Veteran squadron — high risk, rich loot', icon: 'assets/map/node-elite.png' },
     shop:  { name: 'TRADING POST', blurb: 'Spend salvage, refit your ship', icon: 'assets/map/node-shop.png' },
     boss:  { name: 'PIRATE BASE', blurb: "Captain Powder-Keg's fortress — endgame", icon: 'assets/map/node-boss.png' },
+  };
+  const ARRIVAL = {
+    enemy: 'PIRATE AMBUSH — ',
+    elite: 'ELITE SQUADRON ENGAGED — ',
+    shop:  'DOCKED AT TRADING POST — ',
   };
 
   function mulberry32(a) {
@@ -89,16 +100,34 @@
       nodes.push(n);
       n.kind = n.f === SHOP_FLOOR ? 'shop' : (rng() * (ENEMY_W + ELITE_W) < ELITE_W ? 'elite' : 'enemy');
     }
-    return { nodes, edges, start, final, seed };
+    return { nodes, edges, start, final, seed, rng };
   }
 
-  let model = null, current = null, edgeEls = null;
+  /* One legal course, start to boss — the same -1/0/+1 chain a player would plot. */
+  function plotCourse(model) {
+    const route = [model.start];
+    let n = model.start;
+    while (n !== model.final && n.next.length) {
+      n = n.next[Math.floor(model.rng() * n.next.length)];
+      route.push(n);
+    }
+    return route;
+  }
 
+  let model = null, edgeEls = null;
+
+  /* Auto-shown on arrival, so unlike the old hover tip it lands on edge and top
+     nodes every run — clamp it inside the chart instead of letting it hang out. */
   function showTip(n) {
     tip.innerHTML = '<b>' + KINDS[n.kind].name + '</b><span>' + KINDS[n.kind].blurb + '</span>';
-    tip.style.left = n.px + '%';
-    tip.style.top = n.py + '%';
     tip.classList.add('show');
+    const vw = view.clientWidth, vh = view.clientHeight;
+    const half = tip.offsetWidth / 2 / vw * 100;
+    tip.style.left = Math.min(Math.max(n.px, half + 1), 99 - half) + '%';
+    // Sits above the node by default; drop it below when there's no room up there.
+    const below = n.py / 100 * vh < tip.offsetHeight * 1.35;
+    tip.classList.toggle('below', below);
+    tip.style.top = n.py + '%';
   }
   const hideTip = () => tip.classList.remove('show');
 
@@ -112,42 +141,14 @@
     statusEl.classList.toggle('gold', !!gold);
   }
 
-  function updateReach() {
-    for (const n of model.nodes) {
-      n.el.classList.toggle('visited', n.visited);
-      n.el.classList.toggle('reach', current.next.includes(n));
-      n.el.setAttribute('aria-disabled', String(!current.next.includes(n)));
-    }
-    for (const [pair, ln] of edgeEls) {
-      ln.classList.toggle('reach', pair[0] === current);
-    }
+  /* Light the hop the ship is about to make, and nothing else. */
+  function aimAt(from, to) {
+    for (const n of model.nodes) n.el.classList.toggle('reach', n === to);
+    for (const [pair, ln] of edgeEls) ln.classList.toggle('reach', pair[0] === from && pair[1] === to);
   }
-
-  function tryJump(n) {
-    if (!current.next.includes(n)) {
-      if (!n.visited) { n.el.classList.remove('deny'); void n.el.offsetWidth; n.el.classList.add('deny'); }
-      return;
-    }
-    for (const [pair, ln] of edgeEls) {
-      if (pair[0] === current && pair[1] === n) ln.classList.add('taken');
-    }
-    // Point the nose along the jump (sprite faces up).
-    const rect = view.getBoundingClientRect();
-    const dx = (n.px - current.px) / 100 * rect.width, dy = (n.py - current.py) / 100 * rect.height;
-    shipImg.style.transform = 'rotate(' + (Math.atan2(dy, dx) * 180 / Math.PI + 90) + 'deg)';
-    current = n;
-    n.visited = true;
-    placeShip(n);
-    updateReach();
-    if (n === model.final) {
-      status('SECTOR CLEARED — PIRATE BASE DESTROYED', true);
-      rerollBtn.classList.add('pulse');
-    } else {
-      const jumps = FLOORS - n.f;
-      status(n.kind === 'shop'
-        ? 'DOCKED AT TRADING POST — ' + jumps + ' JUMPS TO PIRATE BASE'
-        : jumps + (jumps === 1 ? ' JUMP' : ' JUMPS') + ' TO PIRATE BASE');
-    }
+  function clearAim() {
+    for (const n of model.nodes) n.el.classList.remove('reach');
+    for (const [, ln] of edgeEls) ln.classList.remove('reach');
   }
 
   function render(seed) {
@@ -175,39 +176,120 @@
       edgeEls.push([pair, ln]);
     }
     for (const n of model.nodes) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'mnode k-' + n.kind + (n.big ? ' big' : '');
-      b.style.left = n.px + '%';
-      b.style.top = n.py + '%';
-      b.innerHTML = '<img src="' + KINDS[n.kind].icon + '" alt="">';
-      b.setAttribute('aria-label', KINDS[n.kind].name);
-      b.addEventListener('click', () => tryJump(n));
-      b.addEventListener('mouseenter', () => showTip(n));
-      b.addEventListener('mouseleave', hideTip);
-      b.addEventListener('focus', () => showTip(n));
-      b.addEventListener('blur', hideTip);
-      n.el = b;
-      view.appendChild(b);
+      const d = document.createElement('div');
+      d.className = 'mnode k-' + n.kind + (n.big ? ' big' : '');
+      d.style.left = n.px + '%';
+      d.style.top = n.py + '%';
+      d.innerHTML = '<img src="' + KINDS[n.kind].icon + '" alt="">';
+      n.el = d;
+      n.visited = n === model.start;
+      d.classList.toggle('visited', n.visited);
+      view.appendChild(d);
     }
 
     seedEl.textContent = 'SEED ' + (seed >>> 0).toString(16).toUpperCase().padStart(4, '0');
-    current = model.start;
     shipImg.style.transform = 'rotate(0deg)';
     shipEl.style.transition = 'none';   // teleport home, don't fly across the reroll
-    placeShip(current);
+    placeShip(model.start);
     void shipEl.offsetWidth;
     shipEl.style.transition = '';
-    updateReach();
-    rerollBtn.classList.remove('pulse');
-    status('PLOT A COURSE — SELECT A GLOWING WAYPOINT');
   }
 
-  rerollBtn.addEventListener('click', () => {
-    view.classList.remove('rr'); void view.offsetWidth;
-    render(Math.floor(Math.random() * 0xFFFF) + 1);
-    view.classList.add('rr');
-  });
+  /* Nose the sprite along the hop (the art faces up). */
+  function aimShip(from, to) {
+    const rect = view.getBoundingClientRect();
+    const dx = (to.px - from.px) / 100 * rect.width;
+    const dy = (to.py - from.py) / 100 * rect.height;
+    shipImg.style.transform = 'rotate(' + (Math.atan2(dy, dx) * 180 / Math.PI + 90) + 'deg)';
+  }
 
-  render(Math.floor(Math.random() * 0xFFFF) + 1);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches ||
+    new URLSearchParams(location.search).get('motion') === 'reduce';
+  const newSeed = () => Math.floor(Math.random() * 0xFFFF) + 1;
+
+  /* Reduced motion gets the outcome without the journey: a finished run. */
+  function renderStatic() {
+    render(newSeed());
+    const route = plotCourse(model);
+    for (const n of route) { n.visited = true; n.el.classList.add('visited'); }
+    for (let i = 1; i < route.length; i++) {
+      for (const [pair, ln] of edgeEls) {
+        if (pair[0] === route[i - 1] && pair[1] === route[i]) ln.classList.add('taken');
+      }
+    }
+    placeShip(model.final);
+    status('SECTOR CLEARED — PIRATE BASE DESTROYED', true);
+  }
+
+  /* --- the loop ------------------------------------------------------- */
+  let gen = 0;                         // bumped to cancel whatever is in flight
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  async function flyRun(mine) {
+    const alive = () => mine === gen;
+    render(newSeed());
+    const route = plotCourse(model);
+    status('PLOTTING COURSE FROM HOME STATION');
+    showTip(model.start);
+    await sleep(LAUNCH); if (!alive()) return;
+
+    for (let i = 1; i < route.length; i++) {
+      const from = route[i - 1], to = route[i];
+      hideTip();
+      aimAt(from, to);
+      aimShip(from, to);
+      status('JUMPING TO ' + KINDS[to.kind].name);
+      await sleep(AIM); if (!alive()) return;
+
+      placeShip(to);
+      for (const [pair, ln] of edgeEls) {
+        if (pair[0] === from && pair[1] === to) ln.classList.add('taken');
+      }
+      await sleep(FLIGHT); if (!alive()) return;
+
+      clearAim();
+      to.visited = true;
+      to.el.classList.add('visited');
+      showTip(to);
+      if (to === model.final) {
+        status('SECTOR CLEARED — PIRATE BASE DESTROYED', true);
+        await sleep(CLEARED); if (!alive()) return;
+      } else {
+        const jumps = FLOORS - to.f;
+        status(ARRIVAL[to.kind] + jumps + (jumps === 1 ? ' JUMP' : ' JUMPS') + ' TO PIRATE BASE');
+        await sleep(DWELL); if (!alive()) return;
+      }
+    }
+
+    hideTip();
+    status('GENERATING NEW SECTOR');
+    view.classList.remove('rr'); void view.offsetWidth; view.classList.add('rr');
+    await sleep(REROLL); if (!alive()) return;
+    flyRun(mine);
+  }
+
+  function play() { flyRun(++gen); }
+  function pause() { gen++; }
+
+  if (reduced) {
+    renderStatic();
+    return;
+  }
+
+  render(newSeed());
+  status('AWAITING NAV UPLINK');
+
+  // Only burn frames while the chart is actually being looked at.
+  let onScreen = false;
+  new IntersectionObserver(es => {
+    for (const e of es) {
+      onScreen = e.isIntersecting;
+      if (onScreen && !document.hidden) play(); else pause();
+    }
+  }, { threshold: 0.25 }).observe(view);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+    else if (onScreen) play();
+  });
 })();
