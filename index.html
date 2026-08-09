@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar Aces — 2D Roguelike Space Combat</title>
+<meta name="description" content="Solar Aces is a 2D top-down roguelike spaceship combat game. Build a four-weapon fighter, battle pirates through generated encounters, chase six rarities of loot, and prove your build can survive.">
+<meta property="og:title" content="Solar Aces — 2D Roguelike Space Combat">
+<meta property="og:description" content="Build a four-weapon combat ship and push it through pirate battles, hazards, loot choices, and escalating encounters. Every upgrade changes how you fight.">
+<meta property="og:image" content="assets/hero-banner.jpg">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" href="assets/f222-ring-sm.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600;700&family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050810;
+  --bg2:#0a1020;
+  --panel:#0c1426;
+  --line:#1c2a45;
+  --holo:#57d7ff;
+  --holo-dim:#2c85b5;
+  --gold:#f5b942;
+  --red:#ff4a3d;
+  --blue:#4a7dff;
+  --text:#cfe3f5;
+  --text-dim:#7e93ad;
+  --c-common:#9aa7b5;
+  --c-uncommon:#5fd968;
+  --c-rare:#4aa3ff;
+  --c-epic:#b45cff;
+  --c-legendary:#ff9d2e;
+  --c-mythical:#ff4d7d;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Chakra Petch',sans-serif;
+  overflow-x:hidden;
+}
+.pixel{image-rendering:pixelated;image-rendering:crisp-edges}
+h1,h2,h3,.btn,.navlinks a{font-family:'Press Start 2P',monospace}
+
+/* space background layers + scanlines */
+#space{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+.scanlines{position:fixed;inset:0;z-index:3;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.14) 2px 4px);
+  mix-blend-mode:multiply;animation:crt-flicker 9s steps(1) infinite}
+@keyframes crt-flicker{
+  0%,100%{opacity:1}
+  37%{opacity:.94}37.4%{opacity:1}
+  63%{opacity:.9}63.3%{opacity:1}
+  81%{opacity:.95}81.2%{opacity:1}
+}
+.wrap{position:relative;z-index:1}
+
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;gap:18px;
+  padding:12px 22px;background:rgba(5,8,16,.82);backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line)}
+nav .logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+nav .logo img{width:34px;height:34px}
+nav .logo span{font-family:'Press Start 2P',monospace;font-size:12px;color:var(--gold);letter-spacing:1px}
+.navlinks{margin-left:auto;display:flex;gap:18px;flex-wrap:wrap}
+.navlinks a{color:var(--text-dim);text-decoration:none;font-size:9px;letter-spacing:1px;transition:color .2s}
+.navlinks a:hover{color:var(--holo);text-shadow:0 0 8px var(--holo)}
+.navlinks a.steam-link{color:var(--gold);border:1px solid rgba(245,185,66,.5);padding:7px 11px;
+  background:rgba(245,185,66,.07);transition:all .2s}
+.navlinks a.steam-link:hover{background:var(--gold);color:#120c02;text-shadow:none;
+  box-shadow:0 0 16px rgba(245,185,66,.6)}
+
+/* hero */
+.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  text-align:center;padding:110px 20px 60px;position:relative;overflow:hidden;
+  background:
+    radial-gradient(ellipse 60% 46% at 50% 42%,rgba(5,8,16,.6) 0%,rgba(5,8,16,.3) 55%,transparent 78%),
+    linear-gradient(180deg,rgba(5,8,16,.12) 0%,rgba(5,8,16,.2) 60%,var(--bg) 100%)}
+.hero>*{position:relative;z-index:1}
+.hero-bg-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;z-index:0;pointer-events:none;transition:opacity 1.2s ease}
+body.has-video .hero-bg-video{opacity:.28}
+.hero .ship{width:150px;margin-bottom:26px;filter:drop-shadow(0 0 18px rgba(74,125,255,.55));
+  animation:hover-bob 3.2s ease-in-out infinite}
+@keyframes hover-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+.hero h1{font-size:clamp(28px,6vw,58px);color:#fff;letter-spacing:4px;
+  text-shadow:0 0 22px rgba(87,215,255,.65),0 4px 0 rgba(0,0,0,.6)}
+.hero h1 .sub{color:var(--gold)}
+.tagline{margin:20px auto 8px;max-width:680px;color:var(--holo);font-size:clamp(13px,2vw,17px);
+  font-weight:600;letter-spacing:2px;text-transform:uppercase}
+.tagline2{max-width:640px;color:var(--text-dim);font-size:15px;line-height:1.6;margin:0 auto}
+.cta-row{display:flex;gap:16px;margin-top:34px;flex-wrap:wrap;justify-content:center}
+.btn{display:inline-block;padding:16px 26px;font-size:11px;text-decoration:none;letter-spacing:1px;
+  border:2px solid var(--gold);color:var(--gold);background:rgba(245,185,66,.08);
+  position:relative;transition:all .2s;cursor:pointer}
+.btn:hover{background:var(--gold);color:#120c02;box-shadow:0 0 24px rgba(245,185,66,.65)}
+.btn.alt{border-color:var(--holo);color:var(--holo);background:rgba(87,215,255,.07)}
+.btn.alt:hover{background:var(--holo);color:#03121c;box-shadow:0 0 24px rgba(87,215,255,.6)}
+.btn.pulse{animation:pulse-glow 2.4s ease-in-out infinite}
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 8px rgba(245,185,66,.35)}50%{box-shadow:0 0 26px rgba(245,185,66,.75)}}
+.hero .scroll-hint{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+  color:var(--text-dim);font-size:11px;letter-spacing:2px;animation:hover-bob 2s ease-in-out infinite}
+
+/* gameplay holo-panel */
+.gameplay-panel{position:relative;width:min(760px,92vw);margin-top:40px;
+  border:1px solid var(--holo-dim);background:#000;cursor:pointer;
+  box-shadow:0 0 30px rgba(87,215,255,.18),0 14px 44px rgba(0,0,0,.55)}
+.gameplay-panel::before,.gameplay-panel::after{content:'';position:absolute;width:18px;height:18px;
+  border:2px solid var(--holo);z-index:2}
+.gameplay-panel::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+.gameplay-panel::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+.gameplay-panel video{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+.gameplay-panel .badge{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);
+  font-family:'Press Start 2P',monospace;font-size:9px;letter-spacing:2px;white-space:nowrap;
+  color:var(--holo);background:rgba(5,8,16,.78);border:1px solid var(--holo-dim);
+  padding:8px 14px;z-index:2}
+body.has-video .gameplay-panel .badge{display:none}
+.gameplay-panel .rec{position:absolute;top:12px;right:14px;z-index:2;
+  font-family:'Press Start 2P',monospace;font-size:8px;letter-spacing:1px;color:var(--red)}
+.gameplay-panel .rec::before{content:'●';margin-right:6px;animation:pulse-glow 1.4s infinite}
+
+/* h1 glitch */
+.glitch{position:relative}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;left:0;right:0;top:0;
+  opacity:0;pointer-events:none;mix-blend-mode:screen}
+.glitch.glitching::before{opacity:.7;color:var(--holo);animation:glitch-a .14s steps(2) infinite}
+.glitch.glitching::after{opacity:.7;color:var(--red);animation:glitch-b .17s steps(3) infinite}
+@keyframes glitch-a{
+  0%{transform:translate(-3px,-2px);clip-path:inset(12% 0 58% 0)}
+  50%{transform:translate(3px,1px);clip-path:inset(52% 0 8% 0)}
+  100%{transform:translate(-2px,2px);clip-path:inset(30% 0 38% 0)}}
+@keyframes glitch-b{
+  0%{transform:translate(3px,1px);clip-path:inset(62% 0 6% 0)}
+  50%{transform:translate(-3px,-1px);clip-path:inset(8% 0 70% 0)}
+  100%{transform:translate(2px,-2px);clip-path:inset(42% 0 28% 0)}}
+
+/* tagline typing cursor */
+.tagline{min-height:1.4em}
+.tagline.typing::after{content:'▮';color:var(--holo);animation:cursor-blink .7s steps(1) infinite}
+@keyframes cursor-blink{50%{opacity:0}}
+
+/* sections */
+section{padding:90px 20px;max-width:1100px;margin:0 auto}
+.sec-head{text-align:center;margin-bottom:50px}
+.sec-head h2{font-size:clamp(16px,3vw,26px);color:#fff;letter-spacing:2px;line-height:1.7;
+  text-shadow:0 0 14px rgba(87,215,255,.4)}
+.sec-head h2 span{color:var(--holo)}
+.sec-head h2::after{content:'';display:block;height:2px;width:0;margin:16px auto 0;
+  background:linear-gradient(90deg,transparent,var(--holo),transparent);
+  box-shadow:0 0 10px rgba(87,215,255,.7);transition:width 1s cubic-bezier(.2,.7,.3,1) .2s}
+.sec-head.on h2::after{width:min(240px,60%)}
+.sec-head p{margin-top:14px;color:var(--text-dim);font-size:15px;max-width:640px;margin-left:auto;margin-right:auto;line-height:1.6}
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .7s ease,transform .7s ease}
+.reveal.on{opacity:1;transform:none}
+
+/* holo cards */
+.card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+  position:relative;padding:26px;transition:transform .25s,border-color .25s,box-shadow .25s}
+.card:hover{transform:translateY(-6px);border-color:var(--holo-dim);box-shadow:0 12px 34px rgba(0,0,0,.5),0 0 18px rgba(87,215,255,.12);
+  background-image:linear-gradient(105deg,transparent 42%,rgba(87,215,255,.09) 48%,rgba(87,215,255,.03) 52%,transparent 58%),linear-gradient(180deg,var(--panel),var(--bg2));
+  background-size:250% 100%,100% 100%;background-repeat:no-repeat;
+  animation:card-shimmer .9s ease .05s both}
+@keyframes card-shimmer{from{background-position:130% 0,0 0}to{background-position:-60% 0,0 0}}
+.card::before,.card::after{content:'';position:absolute;width:14px;height:14px;border:2px solid var(--holo);opacity:.75}
+.card::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+.card::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+
+/* features */
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px}
+.feature h3{color:var(--gold);font-size:11px;line-height:1.7;margin-bottom:14px;letter-spacing:1px}
+.feature p{color:var(--text-dim);font-size:14px;line-height:1.65}
+.feature .num{font-family:'Press Start 2P',monospace;color:var(--holo);opacity:.35;font-size:22px;display:block;margin-bottom:12px}
+
+/* ships — hangar viewer */
+.stats{width:100%;text-align:left}
+.stat{margin-bottom:9px}
+.stat label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);
+  letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.stat label b{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--text);font-weight:400}
+.bar{height:8px;background:#0a0f1c;border:1px solid var(--line);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:1px auto 1px 1px;background:linear-gradient(90deg,var(--holo-dim),var(--holo));
+  box-shadow:0 0 8px rgba(87,215,255,.7);width:0}
+.bar.red i{background:linear-gradient(90deg,#a3271f,var(--red));box-shadow:0 0 8px rgba(255,74,61,.7)}
+.bar.gold i{background:linear-gradient(90deg,#a87a1c,var(--gold));box-shadow:0 0 8px rgba(245,185,66,.7)}
+.hangar{display:grid;grid-template-columns:minmax(240px,1fr) minmax(260px,1.2fr);gap:10px 34px;
+  align-items:center;padding:34px}
+.hangar-stage{position:relative;display:flex;align-items:center;justify-content:center;min-height:300px}
+.hangar-stage::before{content:'';position:absolute;width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(87,215,255,.10) 0%,rgba(87,215,255,.04) 45%,transparent 70%)}
+.pedestal-ring{position:absolute;bottom:16px;width:210px;height:54px;border-radius:50%;
+  border:1px solid rgba(87,215,255,.35);box-shadow:0 0 18px rgba(87,215,255,.25),inset 0 0 18px rgba(87,215,255,.15);
+  transform:perspective(300px) rotateX(58deg)}
+.hangar-stage .grid-tick{position:absolute;font-family:'Press Start 2P',monospace;font-size:8px;
+  color:var(--holo-dim);opacity:.6;letter-spacing:1px}
+.hangar-stage .grid-tick.tl{top:6px;left:6px}
+.hangar-stage .grid-tick.br{bottom:6px;right:6px}
+#hangar-sprite{width:200px;height:200px;object-fit:contain;position:relative;z-index:1;
+  filter:drop-shadow(0 0 22px rgba(255,74,61,.45));
+  animation:ship-spin 26s linear infinite}
+@keyframes ship-spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+#hangar-sprite.swap-out{animation:ship-spin 26s linear infinite,sprite-out .16s steps(2) both}
+#hangar-sprite.swap-in{animation:ship-spin 26s linear infinite,sprite-in .22s steps(3) both}
+@keyframes sprite-out{to{opacity:0;scale:.7;filter:drop-shadow(0 0 30px rgba(87,215,255,.9)) saturate(0) brightness(3)}}
+@keyframes sprite-in{from{opacity:0;scale:1.25;filter:drop-shadow(0 0 30px rgba(87,215,255,.9)) saturate(0) brightness(3)}to{opacity:1;scale:1}}
+.hangar-stage.flash::after{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,rgba(87,215,255,.14) 0 2px,transparent 2px 5px),
+    radial-gradient(circle at 50% 55%,rgba(87,215,255,.35),transparent 60%);
+  animation:stage-flash .3s steps(3) both}
+@keyframes stage-flash{from{opacity:1}to{opacity:0}}
+.hangar-info .role{color:var(--holo);font-size:12px;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+.hangar-info h3{color:#fff;font-size:clamp(18px,3vw,26px);letter-spacing:2px;margin-bottom:14px;
+  min-height:1.2em;text-shadow:0 0 14px rgba(87,215,255,.45)}
+.hangar-info .desc{color:var(--text-dim);font-size:14px;line-height:1.65;margin-bottom:16px;min-height:4.2em}
+.loadout{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.loadout .chip{font-size:11px;padding:6px 10px;border-color:rgba(245,185,66,.4);color:var(--gold)}
+.hangar-tabs{display:flex;gap:14px;justify-content:center;margin-top:26px;flex-wrap:wrap}
+.hangar-tab{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);color:var(--text-dim);
+  font-family:'Press Start 2P',monospace;font-size:9px;letter-spacing:1px;
+  position:relative;transition:all .2s}
+.hangar-tab img{width:30px;height:30px;object-fit:contain}
+.hangar-tab:hover{border-color:var(--holo-dim);color:var(--text)}
+.hangar-tab.active{border-color:var(--gold);color:var(--gold);background:rgba(245,185,66,.07);
+  box-shadow:0 0 14px rgba(245,185,66,.25)}
+.hangar-tab .cycle{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--gold);
+  box-shadow:0 0 8px rgba(245,185,66,.8)}
+.hangar-tab.active .cycle{animation:cycle-fill var(--cycle,8s) linear both}
+@keyframes cycle-fill{from{width:0}to{width:100%}}
+
+/* pilots */
+.pilot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:24px}
+.pilot-card{display:flex;flex-direction:column;align-items:center;text-align:center}
+.pilot-frame{position:relative;width:100%;max-width:280px;aspect-ratio:1;overflow:hidden;
+  border:1px solid var(--holo-dim);background:#000;
+  box-shadow:0 0 22px rgba(87,215,255,.16),inset 0 0 30px rgba(0,0,0,.6)}
+.pilot-frame video,.pilot-frame img{display:block;width:100%;height:100%;object-fit:cover;
+  animation:crt-flicker 7s steps(1) infinite}
+.pilot-card:nth-child(2) .pilot-frame video{animation-duration:9s;animation-delay:1.3s}
+.pilot-card:nth-child(3) .pilot-frame video{animation-duration:8s;animation-delay:2.6s}
+.pilot-frame .crt{position:absolute;inset:0;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 2px,rgba(0,0,0,.22) 2px 4px),
+    radial-gradient(ellipse at center,transparent 55%,rgba(0,10,20,.55) 100%)}
+.pilot-frame .rollbar{position:absolute;left:0;right:0;top:-20%;height:14%;pointer-events:none;
+  background:linear-gradient(180deg,transparent,rgba(120,220,255,.10) 45%,rgba(120,220,255,.16) 50%,rgba(120,220,255,.10) 55%,transparent);
+  animation:roll-down 5.5s linear infinite}
+.pilot-card:nth-child(2) .rollbar{animation-duration:7.5s;animation-delay:2s}
+.pilot-card:nth-child(3) .rollbar{animation-duration:6.5s;animation-delay:4s}
+@keyframes roll-down{0%{top:-20%}100%{top:120%}}
+.pilot-frame .pilot-tag{position:absolute;top:8px;left:8px;font-family:'Press Start 2P',monospace;
+  font-size:7px;letter-spacing:1px;color:var(--holo);background:rgba(5,8,16,.7);
+  border:1px solid var(--holo-dim);padding:4px 7px}
+.pilot-frame .pilot-tag::before{content:'●';color:var(--red);margin-right:5px;animation:pulse-glow 1.4s infinite}
+.pilot-frame::after{content:'';position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(87,215,255,.12)}
+.pilot-card h3{color:#fff;font-size:15px;letter-spacing:2px;margin:18px 0 8px;
+  text-shadow:0 0 12px rgba(87,215,255,.5)}
+.pilot-card .pilot-ship{color:var(--gold);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  border:1px solid rgba(245,185,66,.35);padding:5px 10px;margin-bottom:14px}
+.pilot-card .desc{color:var(--text-dim);font-size:13.5px;line-height:1.65}
+
+/* hangar ship ability */
+.hangar-ability{grid-column:1/-1;position:relative;display:grid;grid-template-columns:minmax(260px,1fr) auto;
+  gap:20px 34px;align-items:center;border-top:1px solid var(--line);margin-top:26px;padding-top:30px}
+.hangar-ability .grid-tick.ab{position:absolute;top:10px;left:0;font-family:'Press Start 2P',monospace;
+  font-size:8px;color:var(--holo-dim);letter-spacing:1px}
+.ability-head{display:flex;gap:16px;align-items:flex-start}
+.ability-head>img{width:64px;height:64px;flex:none;border:3px solid #17202f;border-radius:7px;
+  background:var(--bg2);box-shadow:0 0 0 1px rgba(87,215,255,.14),0 4px 10px rgba(0,0,0,.5)}
+.ability-head .ab-name{text-align:left;font-size:21px;margin:0 0 6px}
+.ability-head .desc{color:var(--text-dim);font-size:13px;line-height:1.6;max-width:420px}
+.tree-grid.small{--node:62px;flex:none;gap:22px;margin-bottom:0}
+.tree-grid.small .chain-row{gap:6px}
+.tree-grid.small .chain-link{flex:0 0 14px;min-width:0}
+
+/* arsenal / armory */
+.armory .grid-tick{position:absolute;font-family:'Press Start 2P',monospace;font-size:8px;
+  color:var(--holo-dim);letter-spacing:1px}
+.armory .grid-tick.tl{top:12px;left:0}
+.armory .grid-tick.tr{top:12px;right:0}
+.weapon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:12px;margin-bottom:26px}
+.weapon-tile{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 6px 10px;
+  background:var(--panel);border:1px solid var(--line);cursor:pointer;position:relative;
+  transition:transform .15s,box-shadow .2s,border-color .2s;font-family:inherit}
+.weapon-tile img{width:56px;height:56px}
+.weapon-tile span{font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;text-align:center;line-height:1.4}
+.weapon-tile::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--rc,var(--line));opacity:.85}
+.weapon-tile:hover{transform:translateY(-3px);border-color:var(--rc,var(--holo-dim));
+  box-shadow:0 0 14px color-mix(in srgb,var(--rc,#57d7ff) 35%,transparent)}
+.weapon-tile.active{border-color:var(--rc,var(--holo));box-shadow:0 0 16px color-mix(in srgb,var(--rc,#57d7ff) 45%,transparent)}
+.weapon-tile.active span{color:#fff}
+.armory{display:grid;grid-template-columns:minmax(280px,5fr) minmax(300px,6fr);gap:34px;padding:30px 34px;position:relative}
+.armory-info{position:relative;padding-top:26px}
+.armory-id{display:flex;align-items:center;gap:16px;margin-bottom:14px}
+.armory-id img{width:64px;height:64px;border:1px solid var(--rc,var(--line));padding:6px;background:var(--bg2);
+  box-shadow:0 0 14px color-mix(in srgb,var(--rc,#57d7ff) 30%,transparent)}
+.armory-id h3{color:#fff;font-size:14px;letter-spacing:2px;margin-bottom:8px;text-shadow:0 0 12px rgba(87,215,255,.5)}
+.armory-tags{display:flex;flex-wrap:wrap;gap:6px}
+.wtag{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;padding:4px 8px;
+  border:1px solid var(--line);color:var(--text-dim)}
+.wtag.rarity{border-color:var(--rc);color:var(--rc);text-shadow:0 0 8px}
+.wtag.dmg{--dc:var(--text-dim);border-color:color-mix(in srgb,var(--dc) 55%,transparent);color:var(--dc)}
+.wtag.dmg.explosive{--dc:#ff9d4d}
+.wtag.dmg.energy{--dc:#57d7ff}
+.wtag.dmg.kinetic{--dc:#c8d2dc}
+.armory-info .desc{color:var(--text-dim);font-size:13.5px;line-height:1.65;min-height:64px;margin-bottom:18px}
+.armory .stats{display:flex;flex-direction:column;gap:9px}
+.armory .stat label{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-dim);margin-bottom:4px}
+.armory .stat b{color:var(--text);text-transform:none}
+.armory .bar{height:5px;background:var(--bg2);border:1px solid var(--line);position:relative;overflow:hidden}
+.armory .bar i{position:absolute;inset:0;transform-origin:left;background:var(--holo);width:100%;
+  transform:scaleX(0);transition:transform .6s cubic-bezier(.2,.8,.25,1)}
+/* bar identity colors match the in-game weapon card */
+.armory .bar.red i{background:#e05757}
+.armory .bar.blue i{background:#529ef5}
+.armory .bar.green i{background:#6bcc73}
+.armory .bar.teal i{background:#47ccd1}
+.armory .bar.indigo i{background:#6673f2}
+.armory .bar.violet i{background:#b373f2}
+.armory .bar.peri i{background:#94a3eb}
+.armory .bar.gold i{background:var(--gold)}
+.armory-tree{position:relative;padding-top:26px;display:flex;flex-direction:column}
+.tree-title{font-family:'Baloo 2',sans-serif;font-weight:800;font-size:24px;color:#fff;text-align:center;
+  letter-spacing:2px;margin:2px 0 22px;
+  text-shadow:2px 2px 0 rgba(0,0,0,.85),-1px -1px 0 rgba(0,0,0,.6),1px -1px 0 rgba(0,0,0,.6),-1px 1px 0 rgba(0,0,0,.6)}
+.tree-grid{--node:96px;display:flex;flex-direction:column;justify-content:space-between;gap:22px;flex:1}
+.chain{display:flex;flex-direction:column;gap:14px}
+.chain-head{display:flex;align-items:center;gap:10px;font-family:'Press Start 2P',monospace;
+  font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--holo-dim)}
+.chain-head i{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+.chain-head .chain-count{color:var(--text-dim);opacity:.65}
+.chain-row{display:flex;align-items:flex-start;gap:8px}
+.node-slot{flex:0 0 var(--node);display:flex;flex-direction:column;align-items:center;gap:9px}
+/* link segment sits centred on the icon row and eats the leftover width */
+.chain-link{flex:1 1 auto;min-width:18px;height:2px;margin-top:calc(var(--node)/2 - 1px);
+  position:relative;
+  background:repeating-linear-gradient(90deg,var(--holo-dim) 0 7px,transparent 7px 13px);
+  opacity:.55}
+.chain-link::after{content:'';position:absolute;right:0;top:50%;width:6px;height:6px;
+  border-top:2px solid var(--holo-dim);border-right:2px solid var(--holo-dim);
+  transform:translateY(-50%) rotate(45deg)}
+.chain-link.locked{height:3px;margin-top:calc(var(--node)/2 - 1.5px);opacity:1;
+  background:repeating-linear-gradient(90deg,var(--gold) 0 7px,transparent 7px 13px);
+  filter:drop-shadow(0 0 5px rgba(245,185,66,.55))}
+.chain-link.locked::after{border-color:var(--gold);border-width:3px;width:7px;height:7px}
+.node-cap{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;line-height:1.15}
+.node-cap b{font-family:'Press Start 2P',monospace;font-size:7.5px;letter-spacing:1px;color:var(--holo-dim)}
+.node-cap em{font-family:'Baloo 2',sans-serif;font-style:normal;font-weight:700;font-size:11.5px;
+  letter-spacing:.2px;color:var(--text-dim);transition:color .2s}
+.node-slot:hover .node-cap em,.node-slot:focus-within .node-cap em{color:#fff}
+.talent-node.locked~.node-cap b{color:var(--gold)}
+.node-cap .req{display:flex;flex-direction:column;align-items:center;margin-top:3px;
+  font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--gold);background:rgba(245,185,66,.12);border:1px solid rgba(245,185,66,.5);
+  padding:3px 6px;line-height:1.25}
+.node-cap .req i{font-style:normal;font-size:8.5px;letter-spacing:1px;opacity:.85}
+.tree-legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;
+  border-top:1px solid var(--line);padding-top:12px;
+  font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim)}
+.tree-legend .lg{display:flex;align-items:center;gap:7px}
+.tree-legend .lg i{width:12px;height:12px;border-radius:3px;border:2px solid #2b3d5c;
+  background:var(--bg2);flex:none}
+.tree-legend .lg i.lk{border-color:var(--gold);box-shadow:0 0 8px rgba(245,185,66,.45)}
+.tree-legend .lg-count{margin-left:auto;font-family:'Press Start 2P',monospace;font-size:8px;
+  color:var(--holo-dim);letter-spacing:1px}
+.talent-node{position:relative;background:none;border:none;padding:0;cursor:pointer;font-family:inherit;
+  aspect-ratio:1;width:100%}
+.talent-node img{width:100%;height:100%;display:block;border:3px solid #17202f;border-radius:7px;
+  background:var(--bg2);box-shadow:0 0 0 1px rgba(87,215,255,.14),0 4px 10px rgba(0,0,0,.5);
+  transition:transform .15s,box-shadow .2s,border-color .2s;filter:saturate(.8)}
+.talent-node:hover img,.talent-node.sel img{transform:scale(1.07);border-color:var(--holo-dim);
+  box-shadow:0 0 0 1px rgba(87,215,255,.3),0 0 16px rgba(87,215,255,.35);filter:saturate(1) brightness(1.05)}
+/* locked node: art stays fully visible — the amber frame + glow carry the state */
+.talent-node.locked img{border-color:var(--gold);
+  box-shadow:0 0 0 1px rgba(245,185,66,.45),0 0 14px rgba(245,185,66,.35),0 4px 10px rgba(0,0,0,.55)}
+.talent-node.locked:hover img,.talent-node.locked.sel img{border-color:var(--gold);
+  box-shadow:0 0 0 1px rgba(245,185,66,.6),0 0 22px rgba(245,185,66,.55)}
+.tree-empty{flex:1;display:flex;align-items:center;justify-content:center;
+  text-align:center;color:var(--text-dim);font-size:11px;letter-spacing:2px;
+  border:1px dashed var(--line);padding:38px 12px;text-transform:uppercase}
+.tree-grid.small .tree-empty{flex:none;display:block}
+/* game-style tooltip */
+.talent-tip{position:absolute;z-index:6;width:min(320px,86vw);pointer-events:none;display:none;
+  font-family:'Baloo 2',sans-serif;
+  background:#070b12;border:2px solid #d9dee5;border-radius:13px;
+  box-shadow:0 0 0 3px rgba(4,6,10,.9),0 12px 30px rgba(0,0,0,.65);
+  padding:14px 16px 12px}
+.talent-tip.show{display:block;animation:tip-pop .14s ease-out}
+/* the tip overflows its card, and .card:hover's transform traps its z-index inside
+   the card's stacking context — lift the whole card while a tip is open so it wins
+   against later positioned siblings (e.g. the hangar ship tabs) */
+.card:has(.talent-tip.show){z-index:4}
+@keyframes tip-pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.talent-tip h5{font-size:21px;font-weight:800;color:#fff;text-align:center;line-height:1.15;
+  letter-spacing:.5px;margin:0 0 10px;text-shadow:2px 2px 0 rgba(0,0,0,.9)}
+.tt-body{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+.tt-body>img{width:84px;height:84px;flex:none;background:#0a0f18;border-radius:4px}
+.tt-rows{flex:1;display:flex;flex-direction:column;gap:5px;padding-top:4px}
+.tt-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:#10161f;clip-path:polygon(0 0,100% 0,calc(100% - 10px) 100%,0 100%);
+  padding:3px 16px 3px 10px}
+.tt-row span{color:#aebadf;font-weight:700;font-size:15px}
+.tt-row b{color:#fff;font-weight:800;font-size:15px}
+.tt-row b.lock-val{color:var(--gold)}
+.talent-tip .tt-desc{font-style:italic;font-weight:600;font-size:14.5px;line-height:1.4;
+  color:#cfd6dd;margin:0;text-shadow:1px 1px 0 rgba(0,0,0,.8)}
+
+/* equipment / salvage */
+.rarity-rail{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;margin:-6px 0 30px;
+  font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)}
+.rarity-rail .rr{display:flex;align-items:center;gap:7px}
+.rarity-rail .rr i{width:10px;height:10px;border-radius:2px;background:var(--rc);
+  box-shadow:0 0 8px color-mix(in srgb,var(--rc) 60%,transparent)}
+.equip-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px}
+.equip-card{padding:20px 20px 16px;display:flex;flex-direction:column;gap:13px;
+  box-shadow:inset 0 2px 0 var(--rc,var(--line))}
+.equip-card:hover{border-color:color-mix(in srgb,var(--rc,#57d7ff) 60%,var(--line));
+  box-shadow:inset 0 2px 0 var(--rc),0 12px 34px rgba(0,0,0,.5),
+  0 0 18px color-mix(in srgb,var(--rc,#57d7ff) 22%,transparent)}
+.equip-top{display:flex;align-items:center;gap:14px}
+.equip-top img{width:56px;height:56px;flex:none;border:1px solid var(--rc,var(--line));padding:6px;
+  background:var(--bg2);box-shadow:0 0 14px color-mix(in srgb,var(--rc,#57d7ff) 30%,transparent)}
+.equip-top h3{color:#fff;font-size:12px;letter-spacing:1.5px;line-height:1.5;margin-bottom:7px}
+.equip-card .desc{color:var(--text-dim);font-size:13px;line-height:1.6}
+.equip-stats{list-style:none;display:flex;flex-direction:column;gap:5px;margin-top:auto}
+.equip-stats li{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:#10161f;clip-path:polygon(0 0,100% 0,calc(100% - 10px) 100%,0 100%);
+  padding:4px 18px 4px 10px;font-family:'Baloo 2',sans-serif}
+.equip-stats span{color:#aebadf;font-weight:700;font-size:14.5px}
+.equip-stats b{font-weight:800;font-size:14.5px;color:var(--text)}
+.equip-stats b.buff{color:#8ce99a;text-shadow:0 0 8px rgba(140,233,154,.35)}
+.equip-stats b.nerf{color:var(--red);text-shadow:0 0 8px rgba(255,74,61,.35)}
+.equip-note{align-self:flex-start;font-size:9.5px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--text-dim);border:1px solid var(--line);padding:4px 9px}
+.equip-note.warn{color:var(--gold);border-color:rgba(245,185,66,.4)}
+
+/* enemies */
+.enemy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:22px}
+.enemy-card{text-align:center}
+.enemy-card img{max-width:200px;max-height:200px;margin:6px auto 12px;display:block;
+  filter:drop-shadow(0 0 14px rgba(255,74,61,.35))}
+.enemy-card h3{color:var(--red);font-size:11px;letter-spacing:1px;line-height:1.6;margin-bottom:10px}
+.enemy-card p{color:var(--text-dim);font-size:13.5px;line-height:1.6}
+.threat{display:inline-block;margin-top:12px;font-size:10px;letter-spacing:2px;color:var(--gold);
+  border:1px solid rgba(245,185,66,.4);padding:5px 10px;text-transform:uppercase}
+
+/* star map */
+.starmap-card{position:relative;padding:46px 34px 24px}
+.starmap-card .grid-tick{position:absolute;font-family:'Press Start 2P',monospace;font-size:8px;
+  color:var(--holo-dim);letter-spacing:1px}
+.starmap-card .grid-tick.tl{top:14px;left:16px}
+.starmap-card .grid-tick.tr{top:14px;right:16px}
+.map-view{position:relative;height:min(66vh,620px);aspect-ratio:8.4/9.6;max-width:100%;margin:0 auto}
+.map-view svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.medge{stroke:rgba(87,215,255,.30);stroke-width:2;stroke-dasharray:5 7;vector-effect:non-scaling-stroke;
+  transition:stroke .25s,opacity .25s}
+.medge.reach{stroke:var(--holo);animation:dash-flow .9s linear infinite;
+  filter:drop-shadow(0 0 4px rgba(87,215,255,.8))}
+.medge.taken{stroke:var(--gold);stroke-dasharray:none;filter:drop-shadow(0 0 3px rgba(245,185,66,.6))}
+@keyframes dash-flow{to{stroke-dashoffset:-12}}
+.mnode{position:absolute;transform:translate(-50%,-50%);width:var(--mn,46px);height:var(--mn,46px);
+  border-radius:50%;padding:0;cursor:default;font-family:inherit;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(8,12,22,.92);border:2px solid var(--mc,var(--line));
+  box-shadow:0 0 0 1px rgba(0,0,0,.5),inset 0 0 10px rgba(0,0,0,.6);
+  transition:box-shadow .25s,border-color .25s,opacity .3s}
+.mnode.big{--mn:66px}
+.mnode img{width:60%;height:60%;object-fit:contain;opacity:.92;pointer-events:none}
+.mnode.k-start{--mc:var(--c-uncommon)}
+.mnode.k-enemy{--mc:var(--red)}
+.mnode.k-elite{--mc:var(--c-legendary)}
+.mnode.k-shop{--mc:var(--holo)}
+.mnode.k-boss{--mc:var(--c-mythical)}
+.mnode.reach{cursor:pointer;animation:node-pulse 1.5s ease-in-out infinite}
+.mnode.reach:hover{animation:none;
+  box-shadow:0 0 24px color-mix(in srgb,var(--mc) 75%,transparent),0 0 0 1px rgba(0,0,0,.5)}
+@keyframes node-pulse{
+  0%,100%{box-shadow:0 0 4px color-mix(in srgb,var(--mc) 40%,transparent),0 0 0 1px rgba(0,0,0,.5)}
+  50%{box-shadow:0 0 20px color-mix(in srgb,var(--mc) 80%,transparent),0 0 0 1px rgba(0,0,0,.5)}}
+.mnode.visited{border-color:var(--gold);
+  box-shadow:0 0 12px rgba(245,185,66,.4),0 0 0 1px rgba(0,0,0,.5)}
+.mnode.deny{animation:node-deny .28s ease}
+@keyframes node-deny{25%{transform:translate(-50%,-50%) translateX(-4px)}75%{transform:translate(-50%,-50%) translateX(4px)}}
+.mnode:not(.reach):not(.visited){opacity:.55}
+.mship{position:absolute;z-index:2;width:30px;height:30px;transform:translate(-50%,-50%);
+  pointer-events:none;transition:left .85s cubic-bezier(.45,.05,.25,1),top .85s cubic-bezier(.45,.05,.25,1)}
+.mship img{width:100%;height:100%;filter:drop-shadow(0 0 9px rgba(87,215,255,.9));
+  transition:transform .3s}
+.map-tip{position:absolute;z-index:4;pointer-events:none;display:none;
+  transform:translate(-50%,-130%);white-space:nowrap;text-align:center;
+  background:rgba(5,8,16,.92);border:1px solid var(--holo-dim);padding:7px 11px}
+.map-tip.show{display:block}
+.map-tip b{display:block;font-family:'Press Start 2P',monospace;font-size:8px;letter-spacing:1px;
+  color:var(--holo);margin-bottom:3px}
+.map-tip span{font-size:11px;color:var(--text-dim);letter-spacing:.5px}
+.map-foot{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  border-top:1px solid var(--line);margin-top:20px;padding-top:16px}
+#map-status{font-family:'Press Start 2P',monospace;font-size:9px;line-height:1.7;
+  letter-spacing:1px;color:var(--holo)}
+#map-status.gold{color:var(--gold)}
+.map-reroll{padding:11px 16px;font-size:9px}
+.map-reroll.pulse{animation:pulse-glow 2.4s ease-in-out infinite}
+.map-view.rr .mnode,.map-view.rr .medge{animation:map-glitch .3s steps(3) both}
+@keyframes map-glitch{from{opacity:0;filter:brightness(3) saturate(0)}to{opacity:1}}
+.map-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:18px;margin-top:26px}
+.legend-card{padding:20px 16px;text-align:center}
+.legend-card .ln-ic{width:58px;height:58px;border-radius:50%;margin:0 auto 14px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(8,12,22,.92);border:2px solid var(--mc,var(--line));
+  box-shadow:0 0 16px color-mix(in srgb,var(--mc,#57d7ff) 35%,transparent)}
+.legend-card .ln-ic img{width:58%;height:58%;object-fit:contain}
+.legend-card.k-start{--mc:var(--c-uncommon)}
+.legend-card.k-enemy{--mc:var(--red)}
+.legend-card.k-elite{--mc:var(--c-legendary)}
+.legend-card.k-shop{--mc:var(--holo)}
+.legend-card.k-boss{--mc:var(--c-mythical)}
+.legend-card h3{color:var(--mc);font-size:10px;letter-spacing:1px;line-height:1.6;margin-bottom:10px}
+.legend-card p{color:var(--text-dim);font-size:13px;line-height:1.6}
+.legend-card .ltag{display:inline-block;margin-top:12px;font-size:9px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--text-dim);border:1px solid var(--line);padding:4px 9px}
+
+/* media */
+.media-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.media-slot{aspect-ratio:16/9;border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
+  color:var(--text-dim);font-size:11px;letter-spacing:2px;text-transform:uppercase;
+  background:linear-gradient(135deg,var(--panel),var(--bg2));transition:border-color .2s,color .2s}
+.media-slot:hover{border-color:var(--holo-dim);color:var(--holo)}
+.media-slot.filled{border-style:solid;padding:0;overflow:hidden}
+.media-slot.filled img{width:100%;height:100%;object-fit:cover}
+
+/* footer cta */
+.big-cta{text-align:center;padding:110px 20px;position:relative;
+  background:linear-gradient(180deg,var(--bg) 0%,rgba(12,20,38,.9) 50%,var(--bg) 100%)}
+.big-cta h2{font-size:clamp(16px,3.4vw,28px);color:#fff;letter-spacing:2px;line-height:1.7;margin-bottom:18px;
+  text-shadow:0 0 18px rgba(245,185,66,.5)}
+.big-cta p{color:var(--text-dim);max-width:560px;margin:0 auto 34px;font-size:15px;line-height:1.65}
+footer{border-top:1px solid var(--line);padding:30px 20px;text-align:center;color:var(--text-dim);font-size:12.5px}
+footer a{color:var(--holo);text-decoration:none}
+footer .tiny{margin-top:8px;font-size:11px;opacity:.7}
+@media (max-width:1000px){
+  .tree-grid{--node:82px}
+}
+@media (max-width:760px){
+  .tree-grid{--node:92px}
+  .hangar{grid-template-columns:1fr;padding:24px 18px}
+  .hangar-stage{min-height:240px}
+  .hangar-info .desc{min-height:0}
+  .armory{grid-template-columns:1fr;padding:22px 18px}
+  .armory-info .desc{min-height:0}
+  .armory .grid-tick.tr{display:none}
+  .hangar-ability{grid-template-columns:1fr;justify-items:center}
+  .ability-head{flex-direction:column;align-items:center;text-align:center}
+  .ability-head .ab-name{text-align:center}
+  .weapon-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}
+  .starmap-card{padding:42px 14px 18px}
+  .mnode{--mn:38px}
+  .mnode.big{--mn:52px}
+  .mship{width:24px;height:24px}
+  .map-view{height:min(60vh,540px)}
+  .map-foot{justify-content:center;text-align:center}
+}
+@media (max-width:640px){
+  .navlinks{display:none}
+  section{padding:64px 16px}
+}
+@media (max-width:520px){
+  .tree-grid{--node:74px;gap:18px}
+  .tree-grid .chain-row{gap:6px}
+  .tree-grid .chain-link{min-width:12px}
+  .node-cap em{font-size:10px}
+  .tree-legend .lg-count{display:none}
+}
+@media (max-width:400px){
+  .tree-grid{--node:64px}
+  .mnode{--mn:32px}
+  .mnode.big{--mn:44px}
+}
+@media (prefers-reduced-motion:reduce){
+  .scanlines,.hero .ship,.hero .scroll-hint,.btn.pulse,.rar.c6,.gameplay-panel .rec::before{animation:none}
+  #hangar-sprite,#hangar-sprite.swap-out,#hangar-sprite.swap-in,.hangar-tab .cycle,
+  .pilot-frame video,.pilot-frame .rollbar,.pilot-frame .pilot-tag::before{animation:none}
+  .card:hover{animation:none;background-image:linear-gradient(180deg,var(--panel),var(--bg2))}
+  .glitch.glitching::before,.glitch.glitching::after{animation:none;opacity:0}
+  .sec-head h2::after{transition:none}
+  .reveal{transition:none}
+  .medge.reach,.mnode.reach,.map-reroll.pulse,.map-view.rr .mnode,.map-view.rr .medge{animation:none}
+  .mship{transition:none}
+}
+</style>
+</head>
+<body>
+<canvas id="space"></canvas>
+<div class="scanlines"></div>
+
+<nav>
+  <a class="logo" href="#top">
+    <img src="assets/f222-ring-sm.png" alt="Solar Aces emblem" class="pixel">
+    <span>SOLAR ACES</span>
+  </a>
+  <div class="navlinks">
+    <a href="#features">Game</a>
+    <a href="#ships">Ships</a>
+    <a href="#pilots">Pilots</a>
+    <a href="#arsenal">Arsenal</a>
+    <a href="#equipment">Equipment</a>
+    <a href="#enemies">Enemies</a>
+    <a href="#starmap">Star Map</a>
+    <a href="#media">Media</a>
+    <a href="#wishlist" class="steam-link">Wishlist</a>
+  </div>
+</nav>
+
+<div class="wrap" id="top">
+
+<header class="hero">
+  <video class="hero-bg-video" muted loop autoplay playsinline preload="none" aria-hidden="true"></video>
+  <img class="ship pixel" src="assets/ship-f222.png" alt="F-222 fighter">
+  <h1>SOLAR <span class="sub">ACES</span></h1>
+  <p class="tagline">Fight the build. Not just the enemies.</p>
+  <p class="tagline2">Build a four-weapon combat ship and push it through a run of pirate battles, hazards, loot choices, and escalating encounters. Every upgrade changes how you fight — and every build eventually has to prove it can survive.</p>
+  <div class="cta-row">
+    <a class="btn pulse steam-link" href="#wishlist">&#9733; Wishlist on Steam</a>
+    <a class="btn alt yt-link" href="#" target="_blank" rel="noopener">Follow Development</a>
+  </div>
+  <div class="gameplay-panel" title="Gameplay">
+    <span class="rec">REC</span>
+    <video id="gameplay-video" muted loop playsinline preload="none" poster="assets/hero-banner.jpg"></video>
+    <span class="badge">GAMEPLAY FOOTAGE — IN PRODUCTION</span>
+  </div>
+  <div class="scroll-hint">&#9660; SCROLL</div>
+</header>
+
+<section id="features">
+  <div class="sec-head reveal">
+    <h2>A ROGUELIKE WHERE <span>YOUR SHIP IS THE RUN</span></h2>
+    <p>Fast 2D top-down combat with inertia-based movement. Choose a ship, enter generated encounters, clear pirate waves, and decide which strange new module is worth rebuilding around.</p>
+  </div>
+  <div class="grid4">
+    <div class="card feature reveal"><span class="num">01</span>
+      <h3>FOUR TRIGGERS, FOUR DECISIONS</h3>
+      <p>Equip up to four independently fired weapons. Range, timing, target choice, and energy use all matter — firing everything at once is how builds die.</p>
+    </div>
+    <div class="card feature reveal"><span class="num">02</span>
+      <h3>MODULAR EQUIPMENT</h3>
+      <p>Shape every weapon with branching upgrade paths — armor, reactors, amplifiers, vector drives, and risk-reward modules that change how the whole ship flies.</p>
+    </div>
+    <div class="card feature reveal"><span class="num">03</span>
+      <h3>LET THE RUN CHANGE YOUR PLAN</h3>
+      <p>Weighted loot rewards, six rarity tiers, and pity-driven enemy drops. A strong item can redirect the run; a greedy choice can end it.</p>
+    </div>
+    <div class="card feature reveal"><span class="num">04</span>
+      <h3>ESCALATING ENCOUNTERS</h3>
+      <p>Pirate fighters, snipers, destroyers, asteroid fields, elites, and pirate-base bosses each pressure a different weakness in your loadout.</p>
+    </div>
+  </div>
+</section>
+
+<section id="ships">
+  <div class="sec-head reveal">
+    <h2>CHOOSE YOUR <span>FIGHTER</span></h2>
+    <p>Every ship defines its own hull, shields, energy, speed, starting weapons, and passive ability. More aces join the hangar as development continues.</p>
+  </div>
+  <div class="card hangar reveal">
+    <div class="hangar-stage" id="hangar-stage">
+      <span class="grid-tick tl">HANGAR // 01</span>
+      <span class="grid-tick br">ROT 360°</span>
+      <div class="pedestal-ring"></div>
+      <img id="hangar-sprite" class="pixel" src="assets/ship-f222.png" alt="F-222 ship sprite">
+    </div>
+    <div class="hangar-info">
+      <div class="role" id="hangar-role">Strike Fighter</div>
+      <h3 id="hangar-name">F-222</h3>
+      <p class="desc" id="hangar-desc">Fast, balanced fighter with strong top speed, steady energy recovery, and a laser loadout backed by a defensive barrel roll.</p>
+      <div class="loadout" id="hangar-loadout"></div>
+      <div class="stats" id="hangar-stats">
+        <div class="stat" data-key="hull"><label><span>Hull</span><b>0</b></label><div class="bar red"><i></i></div></div>
+        <div class="stat" data-key="speed"><label><span>Top Speed</span><b>0</b></label><div class="bar gold"><i></i></div></div>
+        <div class="stat" data-key="accel"><label><span>Thrust</span><b>0</b></label><div class="bar gold"><i></i></div></div>
+        <div class="stat" data-key="turn"><label><span>Turn Rate</span><b>0</b></label><div class="bar"><i></i></div></div>
+        <div class="stat" data-key="regen"><label><span>Energy Regen</span><b>0</b></label><div class="bar"><i></i></div></div>
+      </div>
+    </div>
+    <div class="hangar-ability" id="hangar-ability">
+      <span class="grid-tick ab">SHIP ABILITY</span>
+      <div class="ability-head">
+        <img id="ability-icon" class="pixel" src="assets/weapons/barrel-roll.png" alt="Ship ability icon">
+        <div>
+          <h4 class="tree-title ab-name" id="ability-name">BARREL ROLL</h4>
+          <p class="desc" id="ability-desc"></p>
+        </div>
+      </div>
+      <div class="tree-grid small" id="ability-grid"></div>
+      <div class="talent-tip" id="ability-tip" role="tooltip" aria-hidden="true"></div>
+    </div>
+  </div>
+  <div class="hangar-tabs reveal" id="hangar-tabs"></div>
+</section>
+
+<section id="pilots">
+  <div class="sec-head reveal">
+    <h2>MEET THE <span>ACES</span></h2>
+    <p>Every fighter has an ace in the cockpit — live from the cockpit feed, straight out of the game.</p>
+  </div>
+  <div class="pilot-grid">
+    <div class="card pilot-card reveal">
+      <div class="pilot-frame">
+        <video src="assets/pilot-dutch.mp4" poster="assets/pilot-dutch-poster.png" muted loop autoplay playsinline preload="metadata" aria-label="Dutch — animated pilot portrait"></video>
+        <div class="crt"></div><div class="rollbar"></div>
+        <span class="pilot-tag">CAM 01 // LIVE</span>
+      </div>
+      <h3>DUTCH</h3>
+      <div class="pilot-ship">Flies the F-222</div>
+      <p class="desc">Twenty years in the border squadrons and the only thing Dutch trusts is the F-222 he refuses to retire. Doesn't say much; his gun camera does the talking. The younger pilots think he's a legend. Dutch thinks legends get people killed.</p>
+    </div>
+    <div class="card pilot-card reveal">
+      <div class="pilot-frame">
+        <video src="assets/pilot-ziggy.mp4" poster="assets/pilot-ziggy-poster.png" muted loop autoplay playsinline preload="metadata" aria-label="Ziggy — animated pilot portrait"></video>
+        <div class="crt"></div><div class="rollbar"></div>
+        <span class="pilot-tag">CAM 02 // LIVE</span>
+      </div>
+      <h3>ZIGGY</h3>
+      <div class="pilot-ship">Flies the Tracer</div>
+      <p class="desc">Belt courier turned interceptor ace. Ziggy ran contraband through the Kessler shoals for six years without a scratch; the Tracer's blink drive is wired to her reflexes, not the other way around. Talks fast, flies faster, never finishes a debrief.</p>
+    </div>
+    <div class="card pilot-card reveal">
+      <div class="pilot-frame">
+        <video src="assets/pilot-mantis.mp4" poster="assets/pilot-mantis-poster.png" muted loop autoplay playsinline preload="metadata" aria-label="Mantis — animated pilot portrait"></video>
+        <div class="crt"></div><div class="rollbar"></div>
+        <span class="pilot-tag">CAM 03 // LIVE</span>
+      </div>
+      <h3>MANTIS</h3>
+      <div class="pilot-ship">Flies the Die Fighter</div>
+      <p class="desc">Nobody knows where Mantis learned to fly, only that the Die Fighter's insectoid silhouette empties a sector's comm channels when it appears. Patient to the point of unnerving; waits in the dark, strikes once, and is gone before the wreckage cools.</p>
+    </div>
+  </div>
+</section>
+
+<section id="arsenal">
+  <div class="sec-head reveal">
+    <h2>BUILD YOUR <span>ARSENAL</span></h2>
+    <p>Missiles, mines, beams, cannons and machine guns — each weapon fired on its own trigger, each upgraded down its own talent paths. Select a weapon to open its fire-control readout, then tap a talent node to decrypt it.</p>
+  </div>
+  <div class="weapon-grid reveal" id="weapon-grid"></div>
+  <div class="card armory reveal" id="armory">
+    <div class="armory-info">
+      <span class="grid-tick tl">ARMORY // FIRE CONTROL</span>
+      <div class="armory-id">
+        <img id="armory-icon" class="pixel" src="assets/weapons/twin-bolters.png" alt="Selected weapon icon">
+        <div>
+          <h3 id="armory-name">Twin Bolters</h3>
+          <div class="armory-tags" id="armory-tags"></div>
+        </div>
+      </div>
+      <p class="desc" id="armory-desc"></p>
+      <div class="stats" id="armory-stats"></div>
+    </div>
+    <div class="armory-tree">
+      <span class="grid-tick tr">TALENT MATRIX</span>
+      <div class="tree-title" id="tree-title">TWIN BOLTERS</div>
+      <div class="tree-grid" id="tree-grid"></div>
+      <div class="talent-tip" id="talent-tip" role="tooltip" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+
+<section id="equipment">
+  <div class="sec-head reveal">
+    <h2>OUTFIT YOUR <span>SHIP</span></h2>
+    <p>Armor, shield cores, reactors, thrusters — an 18,000-piece generated loot pool across six rarity tiers, slotted into your ship's A/B hardpoints. The best salvage always asks something back: reactors that crack your hull, converters that tax every shot you fire.</p>
+  </div>
+  <div class="rarity-rail reveal">
+    <span class="rr" style="--rc:var(--c-common)"><i></i>Common</span>
+    <span class="rr" style="--rc:var(--c-uncommon)"><i></i>Uncommon</span>
+    <span class="rr" style="--rc:var(--c-rare)"><i></i>Rare</span>
+    <span class="rr" style="--rc:var(--c-epic)"><i></i>Epic</span>
+    <span class="rr" style="--rc:var(--c-legendary)"><i></i>Legendary</span>
+    <span class="rr" style="--rc:var(--c-mythical)"><i></i>Mythic</span>
+  </div>
+  <div class="equip-grid">
+    <div class="card equip-card reveal" style="--rc:var(--c-common)">
+      <div class="equip-top">
+        <img class="pixel" src="assets/equipment/armor-common.png" alt="Alloy Armor equipment icon">
+        <div>
+          <h3>ALLOY ARMOR</h3>
+          <div class="armory-tags"><span class="wtag rarity">Common</span><span class="wtag">Slot A1</span></div>
+        </div>
+      </div>
+      <p class="desc">Reinforced hull plating. The kind of dependable, no-surprises salvage every rookie bolts on first.</p>
+      <ul class="equip-stats">
+        <li><span>Max Hull</span><b class="buff">+10</b></li>
+      </ul>
+      <span class="equip-note">Starting Kit</span>
+    </div>
+    <div class="card equip-card reveal" style="--rc:var(--c-uncommon)">
+      <div class="equip-top">
+        <img class="pixel" src="assets/equipment/halo-core-uncommon.png" alt="Field-Tuned Halo Core equipment icon">
+        <div>
+          <h3>FIELD-TUNED HALO CORE</h3>
+          <div class="armory-tags"><span class="wtag rarity">Uncommon</span><span class="wtag">Slot A1</span></div>
+        </div>
+      </div>
+      <p class="desc">Unified shield core. Capacity, recharge, recovery — one crystal handles all three.</p>
+      <ul class="equip-stats">
+        <li><span>Max Shield</span><b class="buff">+5</b></li>
+        <li><span>Shield Regen</span><b class="buff">+0.25</b></li>
+        <li><span>Shield Delay</span><b class="buff">-0.1s</b></li>
+      </ul>
+      <span class="equip-note">Shield Core</span>
+    </div>
+    <div class="card equip-card reveal" style="--rc:var(--c-rare)">
+      <div class="equip-top">
+        <img class="pixel" src="assets/equipment/reverse-thrusters-rare.png" alt="Counterburn Reverse Thrusters equipment icon">
+        <div>
+          <h3>COUNTERBURN REVERSE THRUSTERS</h3>
+          <div class="armory-tags"><span class="wtag rarity">Rare</span><span class="wtag">Slot A1</span></div>
+        </div>
+      </div>
+      <p class="desc">Retro braking jets. Back off under pressure — most ships can't fly backwards. Yours can.</p>
+      <ul class="equip-stats">
+        <li><span>Reverse Thrust</span><b class="buff">+10%</b></li>
+      </ul>
+      <span class="equip-note">Unlocks Reverse Flight</span>
+    </div>
+    <div class="card equip-card reveal" style="--rc:var(--c-epic)">
+      <div class="equip-top">
+        <img class="pixel" src="assets/equipment/glass-reactor-epic.png" alt="Overbright Glass Reactor equipment icon">
+        <div>
+          <h3>OVERBRIGHT GLASS REACTOR</h3>
+          <div class="armory-tags"><span class="wtag rarity">Epic</span><span class="wtag">Slot B1</span></div>
+        </div>
+      </div>
+      <p class="desc">High-output reactor cell. More power, faster recovery. Fragile — the housing was never rated for this.</p>
+      <ul class="equip-stats">
+        <li><span>Damage</span><b class="buff">+24%</b></li>
+        <li><span>Energy Regen</span><b class="buff">+1.2</b></li>
+        <li><span>Max Hull</span><b class="nerf">-15</b></li>
+      </ul>
+      <span class="equip-note warn">Handle With Care</span>
+    </div>
+    <div class="card equip-card reveal" style="--rc:var(--c-legendary)">
+      <div class="equip-top">
+        <img class="pixel" src="assets/equipment/overload-converter-legendary.png" alt="Cataclysmic Overload Converter equipment icon">
+        <div>
+          <h3>CATACLYSMIC OVERLOAD CONVERTER</h3>
+          <div class="armory-tags"><span class="wtag rarity">Legendary</span><span class="wtag">Slot A1</span></div>
+        </div>
+      </div>
+      <p class="desc">Thermal-to-output converter. More damage. Hungry — it skims energy off every single trigger pull.</p>
+      <ul class="equip-stats">
+        <li><span>Damage</span><b class="buff">+36%</b></li>
+        <li><span>Energy Cost</span><b class="nerf">+10%</b></li>
+      </ul>
+      <span class="equip-note warn">Taxes Every Shot</span>
+    </div>
+    <div class="card equip-card reveal" style="--rc:var(--c-mythical)">
+      <div class="equip-top">
+        <img class="pixel" src="assets/equipment/reckless-overdrive-mythic.png" alt="Deathwish Reckless Overdrive equipment icon">
+        <div>
+          <h3>DEATHWISH RECKLESS OVERDRIVE</h3>
+          <div class="armory-tags"><span class="wtag rarity">Mythic</span><span class="wtag">Slot A1+A3</span></div>
+        </div>
+      </div>
+      <p class="desc">Overdrive trigger. Brutal automatic fire. Unstable — the safety interlocks were the first thing removed.</p>
+      <ul class="equip-stats">
+        <li><span>Attack Speed</span><b class="buff">+15%</b></li>
+        <li><span>Damage</span><b class="buff">+12%</b></li>
+        <li><span>Energy Cost</span><b class="nerf">+10%</b></li>
+      </ul>
+      <span class="equip-note warn">Rapid-Fire Weapons Only</span>
+    </div>
+  </div>
+</section>
+
+<section id="enemies">
+  <div class="sec-head reveal">
+    <h2>KNOW YOUR <span>ENEMY</span></h2>
+    <p>The pirate armada doesn't just add health bars — every enemy changes how you fly.</p>
+  </div>
+  <div class="enemy-grid">
+    <div class="card enemy-card reveal">
+      <img class="pixel" src="assets/enemy-sniper.png" alt="Elite Sniper enemy ship">
+      <h3>ELITE SNIPER</h3>
+      <p>Punishes straight-line flying from across the arena. Close the gap or die at range.</p>
+      <span class="threat">Threat: Elite</span>
+    </div>
+    <div class="card enemy-card reveal">
+      <img class="pixel" src="assets/enemy-boss.png" alt="Pirate Base boss">
+      <h3>PIRATE BASE</h3>
+      <p>Captain Powder-Keg's fortress reads like a clock. Spinning slow it launches fighters, faster it opens up with its guns, faster still it seeds the field with mines.</p>
+      <span class="threat">Threat: Boss</span>
+    </div>
+    <div class="card enemy-card reveal">
+      <img class="pixel" src="assets/asteroid-giant.png" alt="Asteroid hazard">
+      <h3>ASTEROID FIELDS</h3>
+      <p>The pirates are only half the problem. Fields break apart into smaller killers — thread them or turn back into the fire.</p>
+      <span class="threat">Threat: Environmental</span>
+    </div>
+  </div>
+</section>
+
+<section id="starmap">
+  <div class="sec-head reveal">
+    <h2>CHART YOUR <span>COURSE</span></h2>
+    <p>Every run generates a fresh sector map. Jumps only reach connected sites one row up — straight ahead or one lane to either side — so each route is a chain of choices: fight, refit, or gamble on an elite. All routes end at the pirate base. Plot a course below, straight from the game's own map generator.</p>
+  </div>
+  <div class="card starmap-card reveal">
+    <span class="grid-tick tl">NAV // SECTOR CHART</span>
+    <span class="grid-tick tr" id="map-seed">SEED 0000</span>
+    <div class="map-view" id="map-view">
+      <svg id="map-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="mship" id="map-ship"><img src="assets/ship-f222.png" alt="Your ship" class="pixel"></div>
+      <div class="map-tip" id="map-tip" role="tooltip" aria-hidden="true"></div>
+    </div>
+    <div class="map-foot">
+      <span id="map-status">PLOT A COURSE — SELECT A GLOWING WAYPOINT</span>
+      <button class="btn alt map-reroll" id="map-reroll" type="button">&#8635; NEW SECTOR</button>
+    </div>
+  </div>
+  <div class="map-legend">
+    <div class="card legend-card k-start reveal">
+      <div class="ln-ic"><img src="assets/map/node-start.png" alt=""></div>
+      <h3>HOME STATION</h3>
+      <p>Every run launches from the home system with the first ring of waypoints already unlocked. There's no going back — only up.</p>
+      <span class="ltag">Launch Point</span>
+    </div>
+    <div class="card legend-card k-enemy reveal">
+      <div class="ln-ic"><img src="assets/map/node-enemy.png" alt=""></div>
+      <h3>PIRATES</h3>
+      <p>A standard pirate ambush — the backbone of every route. Clear the wave, claim the salvage, jump on.</p>
+      <span class="ltag">Combat &middot; Most Common</span>
+    </div>
+    <div class="card legend-card k-elite reveal">
+      <div class="ln-ic"><img src="assets/map/node-elite.png" alt=""></div>
+      <h3>ELITE PIRATES</h3>
+      <p>A veteran squadron with sharper aim and heavier hulls. Roughly one contact in three — richer rewards, if your build holds.</p>
+      <span class="ltag">Combat &middot; Elite</span>
+    </div>
+    <div class="card legend-card k-shop reveal">
+      <div class="ln-ic"><img src="assets/map/node-shop.png" alt=""></div>
+      <h3>TRADING POST</h3>
+      <p>A neutral station row at the sector midpoint — every route passes one. Spend salvage and refit before the final push.</p>
+      <span class="ltag">Resupply &middot; Mid-Sector</span>
+    </div>
+    <div class="card legend-card k-boss reveal">
+      <div class="ln-ic"><img src="assets/map/node-boss.png" alt=""></div>
+      <h3>PIRATE BASE</h3>
+      <p>Captain Powder-Keg's fortress waits at the top of every sector. All routes converge here — only one of you leaves.</p>
+      <span class="ltag">Boss &middot; Final Node</span>
+    </div>
+  </div>
+</section>
+
+<section id="media">
+  <div class="sec-head reveal">
+    <h2>FROM THE <span>COCKPIT</span></h2>
+    <p>Trailer and gameplay captures are in production — chain-pop destructions, hazard runs, and four-weapon builds. Check back soon.</p>
+  </div>
+  <div class="media-grid reveal">
+    <div class="media-slot filled"><img src="assets/hero-banner.jpg" alt="Solar Aces key art"></div>
+    <div class="media-slot">Trailer — Coming Soon</div>
+    <div class="media-slot">Screenshot Slot</div>
+    <div class="media-slot">Screenshot Slot</div>
+  </div>
+</section>
+
+<div class="big-cta" id="wishlist">
+  <h2>SAVE YOUR HOME.<br>ONE RUN AT A TIME.</h2>
+  <p>Wishlist Solar Aces and follow development as new ships, enemies, equipment, encounters, and combat polish are added.</p>
+  <div class="cta-row">
+    <a class="btn pulse steam-link" href="#">&#9733; Wishlist on Steam — Coming Soon</a>
+    <a class="btn alt yt-link" href="#" target="_blank" rel="noopener">Watch Devlogs on YouTube</a>
+  </div>
+</div>
+
+<footer>
+  <div>SOLAR ACES — a game by <a class="yt-link" href="#" target="_blank" rel="noopener">Devastadus</a></div>
+  <div class="tiny">&copy; 2026 Devastadus. All ship, pilot, and enemy art from the actual game.</div>
+</footer>
+
+</div>
+
+<script>
+/* ====== EDIT THESE WHEN LINKS GO LIVE ====== */
+const STEAM_URL = "";                        // e.g. "https://store.steampowered.com/app/XXXXXXX/Solar_Aces/"
+const YOUTUBE_URL = "https://www.youtube.com/@Devastadus";
+/* =========================================== */
+
+document.querySelectorAll('.steam-link').forEach(a=>{
+  if(STEAM_URL){ a.href = STEAM_URL; a.target="_blank"; a.rel="noopener"; }
+  else if(a.getAttribute('href')==="#"){ a.addEventListener('click',e=>{e.preventDefault();
+    document.getElementById('wishlist').scrollIntoView({behavior:'smooth'});}); }
+});
+document.querySelectorAll('.yt-link').forEach(a=>{
+  if(YOUTUBE_URL){ a.href = YOUTUBE_URL; }
+  else{ a.addEventListener('click',e=>e.preventDefault()); }
+});
+
+/* reveal on scroll + stat bars */
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){
+    e.target.classList.add('on');
+    e.target.querySelectorAll('.bar i').forEach(b=>b.style.width=b.dataset.w);
+    io.unobserve(e.target);
+  }
+}),{threshold:.15});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+document.querySelectorAll('.ship-card .bar i').forEach(b=>{
+  const card=b.closest('.reveal');
+  if(card&&card.classList.contains('on'))b.style.width=b.dataset.w;
+});
+</script>
+<script src="js/space.js" defer></script>
+<script src="js/weapons-data.js" defer></script>
+<script src="js/talents.js" defer></script>
+<script src="js/hangar.js" defer></script>
+<script src="js/arsenal.js" defer></script>
+<script src="js/starmap.js" defer></script>
+<script src="js/juice.js" defer></script>
+</body>
+</html>
